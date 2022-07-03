@@ -1453,6 +1453,7 @@ const countries = `
   international_dialing_prefix: "10"
 `
 
+// Country holds country information.
 type Country struct {
 	Number                     string `yaml:"number"`
 	Name                       string `yaml:"name"`
@@ -1470,10 +1471,64 @@ type Country struct {
 var Countries map[string]Country
 
 func init() {
-	Countries = Load()
+	Countries = loadCountries()
 }
 
-func Load() map[string]Country {
+// FindByCountryCode finds country by dialing code.
+func FindByCountryCode(code string) *Country {
+	if country, found := Countries[code]; found {
+		return &country
+	}
+	return nil
+}
+
+// FindByCountryIsoCode finds country by ISO code (case insensitive).
+func FindByCountryIsoCode(isoCode string) (c *Country) {
+	for _, v := range Countries {
+		if strings.EqualFold(isoCode, v.Char3Code) {
+			return &v
+		}
+	}
+	return nil
+}
+
+func (c *Country) CountryCodeRegexp() *regexp.Regexp {
+	exp := fmt.Sprintf("^[+]%s", c.CountryCode)
+	re, _ := regexp.Compile(exp)
+
+	return re
+}
+
+func (c *Country) Formats() (*regexp.Regexp, *regexp.Regexp) {
+	numberRegex := fmt.Sprintf("([0-9]{1,%s})$", c.MaxNumLength)
+	short := regexp.MustCompile(fmt.Sprintf("^0?(%s)%s", c.AreaCode, numberRegex))
+	reallyShort := regexp.MustCompile(fmt.Sprintf("^%s", numberRegex))
+	return short, reallyShort
+}
+
+func (c *Country) DetectFormat(stringWithNumber string) string {
+	sh, real := c.Formats()
+
+	var arr []string
+	if sh.MatchString(stringWithNumber) {
+		arr = append(arr, "short")
+	}
+
+	if real.MatchString(stringWithNumber) {
+		arr = append(arr, "really_short")
+	}
+
+	switch {
+	case len(arr) > 1:
+		return "really_short"
+	case len(arr) == 0:
+		return "short"
+	default:
+		return arr[0]
+	}
+}
+
+func loadCountries() map[string]Country {
 	var c map[string]Country
 
 	err := yaml.Unmarshal([]byte(countries), &c)
@@ -1483,67 +1538,18 @@ func Load() map[string]Country {
 	return c
 }
 
-func detectCountry(s, defaultCode string) (c *Country) {
-	_c := Country{}
+func detectCountry(s, defaultCode string) *Country {
 	for k, v := range Countries {
 		re := fmt.Sprintf("^[+]%s", k)
 		matched, _ := regexp.MatchString(re, s)
 		if matched {
-			_c = v
+			return &v
 		}
 	}
+
+	_c := Country{}
 	if _c.CountryCode == "" {
 		_c = Countries[defaultCode]
 	}
-	c = &_c
-
-	return c
-}
-func FindByCountryCode(code string) *Country {
-	c := Countries[code]
-	return &c
-}
-
-func FindByCountryIsoCode(isCcode string) (c *Country) {
-	for _, v := range Countries {
-		if isCcode == strings.ToLower(v.Char3Code) {
-			c = &v
-		}
-	}
-	return c
-}
-
-func (c Country) CountryCodeRegexp() *regexp.Regexp {
-	exp := fmt.Sprintf("^[+]%s", c.CountryCode)
-	re, _ := regexp.Compile(exp)
-
-	return re
-}
-
-func (c Country) Formats() (*regexp.Regexp, *regexp.Regexp) {
-	numberRegex := fmt.Sprintf("([0-9]{1,%s})$", c.MaxNumLength)
-	short := regexp.MustCompile(fmt.Sprintf("^0?(%s)%s", c.AreaCode, numberRegex))
-	reallyShort := regexp.MustCompile(fmt.Sprintf("^%s", numberRegex))
-
-	return short, reallyShort
-}
-
-func (c Country) DetectFormat(stringWithNumber string) string {
-	sh, real := c.Formats()
-	var arr []string
-
-	if sh.MatchString(stringWithNumber) {
-		arr = append(arr, "short")
-	}
-	if real.MatchString(stringWithNumber) {
-		arr = append(arr, "really_short")
-	}
-	if len(arr) > 1 {
-		return "really_short"
-	}
-	if len(arr) == 0 {
-		return "short"
-	}
-
-	return arr[0]
+	return &_c
 }

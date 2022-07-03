@@ -1,84 +1,90 @@
 package phone
 
 import (
-	"fmt"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
-func TestLoad(t *testing.T) {
-	c := Load()
-	fmt.Printf("c lenth is  %d", len(c))
-}
-
-func TestExtractExtension(t *testing.T) {
-	s1, s2 := extractExtension("+385915125486")
-	fmt.Printf("s1 is %s and s2 is %s", s1, s2)
-}
-
-func TestValid(t *testing.T) {
-	c := Valid("+385915125486")
-	fmt.Printf("phone is %v", c)
+func TestIsValid(t *testing.T) {
+	valid := IsValid("+385915125486")
+	assert.True(t, valid)
 }
 
 func TestParse(t *testing.T) {
-	c, err := Parse("+00385915125486")
-	s := c.ToS()
-	fmt.Printf("phone is %v \n", c)
-	fmt.Printf("error is %v \n", err)
-	fmt.Printf("phone string %v \n", s)
+	phone, err := Parse("+00385915125486")
+	assert.Nil(t, err)
+	assert.Equal(t, phone.CountryCode, "+385")
+	assert.Equal(t, phone.String(), "+385915125486")
 }
 
 func TestNormalize(t *testing.T) {
-	c := normalize("+00385915125486")
-	fmt.Printf("string is %v", c)
+	normalizedPhone := normalize("+00385915125486")
+	assert.Equal(t, normalizedPhone, "+385915125486")
 }
 
 func TestNew(t *testing.T) {
 	args := []string{"5125486", "91", "385", "143"}
-	c, err := New(args)
-	fmt.Printf("error is %v \n", err)
-	fmt.Printf("string is %v", c)
+	phone, err := New(args)
+	assert.Nil(t, err)
+	assert.Equal(t, phone.String(), "+385915125486")
+	assert.Equal(t, phone, &Phone{N1Length: "3", Number: "5125486", CountryCode: "385", AreaCode: "91", Extension: "143"})
 }
 
 func TestFormat(t *testing.T) {
-	c, err := Parse("+00385915125486x148")
-	fmt.Printf("error is %v \n", err)
-	f := c.format("%A/%f-%l")
-	n := c.format("+ %c (%a) %n")
-	europe := c.format("europe")
-	us := c.format("us")
-	ex := c.format("default_with_extension")
-	fmt.Printf("c is %v \n", c)
-	fmt.Printf("f is %v \n", f)
-	fmt.Printf("n is %v \n", n)
-	fmt.Printf("europe is %v \n", europe)
-	fmt.Printf("us is %v \n", us)
-	fmt.Printf("ex is %v \n", ex)
+	phone, err := Parse("+00385915125486x148")
+	assert.Nil(t, err)
+
+	f := phone.Format("%A/%f-%l")
+	assert.Equal(t, f, "091/512-5486")
+
+	n := phone.Format("+ %c (%a) %n")
+	assert.Equal(t, n, "+385 (91) 5125486")
+
+	europe := phone.Format("europe")
+	assert.Equal(t, europe, "+385 (0) 91 512 5486")
+
+	us := phone.Format("us")
+	assert.Equal(t, us, "(91) 512-5486")
+
+	ex := phone.Format("default_with_extension")
+	assert.Equal(t, ex, "+385915125486x148")
 }
-func TestSetDefault(t *testing.T) {
-	SetDefaultAreaCode("47")
-	SetDefaultCountryCode("385")
-	c, err := Parse("451-588")
-	fmt.Printf("error is %v \n", err)
-	f := c.format("%A/%f-%l")
-	n := c.format("+ %c (%a) %n")
-	europe := c.format("europe")
-	us := c.format("us")
-	ex := c.format("default_with_extension")
-	fmt.Printf("c is %v \n", c)
-	fmt.Printf("f is %v \n", f)
-	fmt.Printf("n is %v \n", n)
-	fmt.Printf("europe is %v \n", europe)
-	fmt.Printf("us is %v \n", us)
-	fmt.Printf("ex is %v \n", ex)
+
+func TestSetDefaultCountryCodeAndAreaCode(t *testing.T) {
+	SetDefaultAreaCode("4")
+	SetDefaultCountryCode("32")
+
+	phone, err := Parse("451-588")
+	assert.Nil(t, err)
+
+	f := phone.Format("%A/%f-%l")
+	assert.Equal(t, f, "04/515-1588")
+
+	n := phone.Format("+ %c (%a) %n")
+	assert.Equal(t, n, "+32 (4) 51588")
+
+	europe := phone.Format("europe")
+	assert.Equal(t, europe, "+32 (0) 4 515 1588")
+
+	us := phone.Format("us")
+	assert.Equal(t, us, "(4) 515-1588")
+
+	ex := phone.Format("default_with_extension")
+	assert.Equal(t, ex, "+32451588")
 }
 
 func TestFindByCountryIsoCode(t *testing.T) {
-	f := FindByCountryIsoCode("de")
-	fmt.Printf("f is %v \n", f)
+	country := FindByCountryIsoCode("BE")
+	assert.NotNil(t, country)
+	assert.Equal(t, country.CountryCode, "32")
 }
 
 func TestFindByCountryCode(t *testing.T) {
-	f := FindByCountryCode("385222222222")
-	fmt.Printf("f is %v \n", f)
+	country := FindByCountryCode("not_found")
+	assert.Nil(t, country)
+
+	country = FindByCountryCode("32")
+	assert.NotNil(t, country)
+	assert.Equal(t, country.Name, "Belgium")
 }
